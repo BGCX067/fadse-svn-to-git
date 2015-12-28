@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Document: FemsPredictor.xml Created on: June 11, 2015 Author: Stefan 
+	Feilmeier Description: Input file for FemsPvPredictorSimulator -->
+<design_space>
+	<simulator name="FemsPredictorSimulator" type="simulator">
+		<parameter name="Device" value="fems20" />
+		<parameter name="LeadWindowSize" value="36" /> <!-- 3 hours @ 5 minutes: 3*(60/5) -->
+	</simulator>
+	<database ip="localhost" port="3306" name="FemsPredictor"
+		user="fadse" password="password" />
+	<benchmarks> <!-- which field to predict -->
+		<item name="PV1" />
+		<item name="PV2" />
+		<item name="Ph1" />
+		<item name="Ph2" />
+		<item name="Ph3" />
+	</benchmarks>
+	<metaheuristic name="NSGAII"
+		config_path="D:\fems\fadse\trunk\src\main\java\ro\ulbsibiu\fadse\extended\problems\simulators\fems\nsgaii.properties" />
+	<parameters>
+		<parameter name="NoOfHiddenNeurons"
+			description="Number of neurons on the hidden layer of the neural network"
+			type="integer" min="1" max="270" /><!-- Applying rule of thumb: Nh = (Ni+No)/2+sqrt(Np) -->
+		<parameter name="LagWindowSize" description="Size of lag window for time series"
+			type="integer" min="1" max="900" /><!-- up to about 3 days -->
+	</parameters>
+	<virtual_parameters></virtual_parameters>
+	<system_metrics>
+		<system_metric name="TrainingError" type="float" unit="" desired="small" />
+		<system_metric name="ValidationError" type="float" unit="" desired="small" />
+	</system_metrics>
+	<rules></rules>
+	<relations>
+	</relations>
+	<output output_path="D:\fems\fadse\output" />
+</design_space>

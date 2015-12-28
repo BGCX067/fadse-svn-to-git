@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : neighborConfig.xml
+    Created on : June 22, 2010, 12:23 PM
+    Author     : Horia Calborean
+    Description:
+        Purpose of the document follows.
+-->
+
+<neighbors>
+       <neighbor ip="172.16.21.11" listenPort="4445" availableSlots = "1" />
+       <neighbor ip="172.16.21.12" listenPort="4445" availableSlots = "1" />
+       <neighbor ip="172.16.21.13" listenPort="4445" availableSlots = "1" />
+       <neighbor ip="172.16.21.14" listenPort="4445" availableSlots = "1" />
+      <neighbor ip="172.16.21.16" listenPort="4445" availableSlots = "1" />
+       <neighbor ip="172.16.21.17" listenPort="4445" availableSlots = "1" />
+       <neighbor ip="172.16.21.18" listenPort="4445" availableSlots = "1" />
+       <neighbor ip="172.16.21.20" listenPort="4445" availableSlots = "1" />
+<!--    <neighbor   ip="172.16.8.69"
+                listenPort="4445"
+                availableSlots = "1"
+    />-->
+<!--        <neighbor   ip="172.16.8.71"
+                listenPort="4445"
+                availableSlots = "1"
+    />-->
+
+<!--    <neighbor   ip="172.16.8.71"
+                listenPort="4445"
+                availableSlots = "1"
+    />
+    <neighbor   ip="172.16.8.72"
+                listenPort="4445"
+                availableSlots = "1"
+    />-->
+</neighbors>

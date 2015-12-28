@@ -1,0 +1,181 @@
+package ro.ulbsibiu.fadse.extended.problems.simulators;
+
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.Reader;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.TreeMap;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
+import org.encog.Encog;
+
+import ro.ulbsibiu.fadse.environment.Environment;
+import ro.ulbsibiu.fadse.environment.Individual;
+import ro.ulbsibiu.fadse.environment.Objective;
+import ro.ulbsibiu.fadse.extended.problems.simulators.fems.FemsConstants;
+import ro.ulbsibiu.fadse.extended.problems.simulators.fems.FemsIndividualParameters;
+import ro.ulbsibiu.fadse.extended.problems.simulators.fems.FemsSimulatorParameters;
+import ro.ulbsibiu.fadse.extended.problems.simulators.fems.FemsTimeSeriesSimulator;
+import ro.ulbsibiu.fadse.extended.problems.simulators.fems.Normalizer;
+
+/**
+ * 
+ * @author Stefan Feilmeier
+ */
+public class FemsPredictorSimulator extends SimulatorBase {
+	private static final long serialVersionUID = 5241265466817140328L;
+	
+	private final HashSet<String> fields = new HashSet<String>();
+	private final TreeMap<Long, HashMap<String, Double>> fieldsPerTimestamp = new TreeMap<Long, HashMap<String, Double>>();
+	private final FemsSimulatorParameters simulatorParameters;
+
+	public FemsPredictorSimulator(Environment environment) throws ClassNotFoundException {
+		super(environment);
+
+		// Set simulator parameters
+		FemsSimulatorParameters simulatorParameters;
+		try {
+			simulatorParameters = FemsSimulatorParameters.factory(environment.getInputDocument());
+		} catch (Exception e) {
+			e.printStackTrace();
+			// unfortunately we can only throw ClassNotFoundException
+			throw new ClassNotFoundException(e.getMessage());
+		}
+		this.simulatorParameters = simulatorParameters;
+
+		// Initialize output path
+		for (File file : simulatorParameters.getOutputPath().listFiles()) {
+			file.delete();
+		}
+
+		HashMap<String, Double> maxValuesPerField = new HashMap<String, Double>();
+		HashMap<String, Double> minValuesPerField = new HashMap<String, Double>();
+
+		// Read CSV file
+		try {
+			Reader in = new FileReader(Paths.get(FemsConstants.FILESPATH, simulatorParameters.getDevice() + ".csv")
+					.toFile());
+			final Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(in);
+			for (CSVRecord record : records) {
+				HashMap<String, Double> valuesPerField = new HashMap<String, Double>();
+				for (Map.Entry<String, String> valuePerField : record.toMap().entrySet()) {
+					String field = valuePerField.getKey();
+					if(field.equals("timestamp")) continue; //ignore timestamp
+					Double value = Double.parseDouble(valuePerField.getValue());
+					valuesPerField.put(field, value);
+					fields.add(field); // Get list of fields
+
+					// Get max/min value per field for normalizer
+					Double previousMaxValuePerField = maxValuesPerField.get(field);
+					if (previousMaxValuePerField == null || previousMaxValuePerField < value) {
+						maxValuesPerField.put(field, value);
+					}
+					Double previousMinValuePerField = minValuesPerField.get(field);
+					if (previousMinValuePerField == null || previousMinValuePerField > value) {
+						minValuesPerField.put(field, value);
+					}
+				}
+				Long timestamp = Long.parseLong(record.get("timestamp"));
+				fieldsPerTimestamp.put(timestamp, valuesPerField);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			// unfortunately we can only throw ClassNotFoundException
+			throw new ClassNotFoundException(e.getMessage());
+		}
+
+		// Prepare Normalizer
+		HashMap<String, Normalizer> normalizers = new HashMap<String, Normalizer>();
+		for(String field : fields) {
+			Normalizer normalizer = new Normalizer(minValuesPerField.get(field), maxValuesPerField.get(field), 0, 1);
+			normalizers.put(field, normalizer);
+		}
+		
+		// Write Properties file
+		Properties properties = new Properties();
+		properties.put("Device", simulatorParameters.getDevice());
+		properties.put("LeadWindowSize", Integer.toString(simulatorParameters.getLeadWindowSize()));
+		for(Map.Entry<String, Normalizer> normalizerPerField : normalizers.entrySet()) {
+			String prefix = "Normalizer_" + normalizerPerField.getKey() + "_";
+			Normalizer norm = normalizerPerField.getValue();
+			properties.setProperty(prefix + "DataLow", Double.toString(norm.getDataLow()));
+			properties.setProperty(prefix + "DataHigh", Double.toString(norm.getDataHigh()));
+			properties.setProperty(prefix + "NormalizedLow", Double.toString(norm.getNormalizedLow()));
+			properties.setProperty(prefix + "NormalizedHigh", Double.toString(norm.getNormalizedHigh()));
+		}
+		FileWriter writer = null; 
+		try {
+			writer = new FileWriter(new File(simulatorParameters.getOutputPath(), "properties.prop"), false);
+			properties.store(writer, "Generated by FADSE for FEMS");
+		} catch (Exception e) {
+			e.printStackTrace();
+			// unfortunately we can only throw ClassNotFoundException
+			throw new ClassNotFoundException(e.getMessage());
+		}
+		
+		// Normalize dataCache
+		for(Map.Entry<Long, HashMap<String, Double>> fieldPerTimestamp : fieldsPerTimestamp.entrySet()) {
+			HashMap<String, Double> valuesPerField = fieldPerTimestamp.getValue();
+			for(Map.Entry<String, Double> valuePerField : valuesPerField.entrySet()) {
+				String field = valuePerField.getKey();
+				Double value = valuePerField.getValue();
+				Double normValue = normalizers.get(field).normalize(value);
+				valuePerField.setValue(normValue);
+			}
+		}
+	}
+
+	/**
+	 * Execute the simulation and return its error
+	 * 
+	 * @param individual
+	 *            : the specific individual for this run
+	 */
+	@Override
+	public void performSimulation(Individual individual) {
+		// Set individual parameters
+		FemsIndividualParameters individualParameters;
+		try {
+			individualParameters = FemsIndividualParameters.factory(individual);
+		} catch (Exception e1) {
+			e1.printStackTrace();
+			return;
+		}
+		System.out.println();
+		System.out.println("Start FEMS Predictor Simulation:");
+		System.out.println("     " + simulatorParameters.toString());
+		System.out.println("     " + individualParameters.toString());
+
+		// Run simulation
+		FemsTimeSeriesSimulator simulator = new FemsTimeSeriesSimulator();
+		Map<String, Double> results = simulator.performSimulation(simulatorParameters, individualParameters, fieldsPerTimestamp);
+		for (Map.Entry<String, Double> result : results.entrySet()) {
+			System.out.println("  " + result.getKey() + ": " + result.getValue());
+		}
+
+		// Return error objective
+		List<Objective> objectives = individual.getObjectives();
+		for (Objective objective : objectives) {
+			objective.setValue(results.get(objective.getName()));
+		}
+
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		// Shutdown encog
+		Encog.getInstance().shutdown();
+
+		System.out.println("Finished FEMS PV Predictor Simulation: " + individualParameters.toString());
+		System.out.println();
+	}
+}

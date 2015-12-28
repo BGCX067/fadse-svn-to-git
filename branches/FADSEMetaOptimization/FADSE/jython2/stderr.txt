@@ -1,0 +1,1 @@
+Current working directory: /home/camil/RSPDT/Projects/University/Research/Simulators/FADSE/trunk/FADSE
